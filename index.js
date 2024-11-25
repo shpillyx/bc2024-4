@@ -64,4 +64,21 @@ function Delete (filePath, res) {
   });
 }
    
-    
+server.on ('request', (req, res) => {
+  const code = req.url.slice(1);
+  const filePath = path.join(options.cache,`${code}.jpg` );
+  switch (req.method) {
+    case 'GET':
+      Get(code, filePath, res);
+      break;
+    case 'PUT':
+      Put(filePath, req, res);
+      break;
+    case 'DELETE':
+      Delete(filePath, res);
+      break;
+    default:
+      res.writeHead(405);
+      res.end();
+  }
+});   
