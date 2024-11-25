@@ -1,14 +1,15 @@
 {
-  "name": "4lab",
+  "name": "bc2024-4",
   "version": "1.0.0",
+  "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon index.js --host \"127.0.0.1\" --port 8000 --cache ./cache"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "commander": "^12.1.0",
     "superagent": "^10.1.1"
