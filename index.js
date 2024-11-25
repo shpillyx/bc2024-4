@@ -25,7 +25,7 @@ server.listen(options.port, options.host, () => {
 });
 
 function Get(code, filePath, res) {
-  fs.readFile(filePath)
+  fs.promises.readFile(filePath)
   .then(data => {
     res.writeHead(200, { 'Content-Type': 'image/jpeg' });
     res.end(data);
@@ -40,7 +40,7 @@ function Put (filePath,req,res) {
   const data = [];
   req.on('data', chunk => data.push(chunk));
   req.on('end', () => {
-    fs.writeFile(filePath, Buffer.concat(data)) 
+    fs.promises.writeFile(filePath, Buffer.concat(data)) 
     .then(() => {
       res.writeHead(201);
       res.end('File created');
@@ -65,21 +65,3 @@ function Delete (filePath, res) {
 }
    
     
-server.on ('request', (req, res) => {
-  const code = req.url.slice(1);
-  const filePath = path.join(options.cache,`${code}.jpg` );
-  switch (req.method) {
-    case 'GET':
-      Get(code, filePath, res);
-      break;
-    case 'PUT':
-      Put(filePath, req, res);
-      break;
-    case 'DELETE':
-      Delete(filePath, res);
-      break;
-    default:
-      res.writeHead(405);
-      res.end();
-  }
-});
