@@ -2,83 +2,109 @@ const { program } = require('commander');
 const http = require('http');
 const fs = require('fs/promises');
 const path = require('path');
+const superagent = require('superagent');
+const options = program.opts();
+
+
 program
     .option('-h, --host <host>', 'Адреса сервера')
     .option('-p, --port <port>', 'Порт сервера')
     .option('-c, --cache <cacheDir>', 'Шлях до директорії з кешем');
 
 program.parse();
-const options = program.opts();
+
+
 //перевірка на наявність обов*язкових параметрів і на правильність
 if (!options.host || !options.port || !options.cache) {
     console.error('Please, specify necessary param');
     process.exit(1);
 }
 
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Server is working');
-});
+const requestListener = async function (req, res) {
+    const filePath = path.join(options.cache, req.url + ".jpg");
+    switch(req.method){
+        case 'GET':
+            fs.readFile(filePath)
+            .then(content => {
+              console.log('Картинку взято з кешу');
+              res.setHeader("Content-Type", "image/jpeg");
+              res.writeHead(200);
+              res.end(content);
+            })
+            .catch(async () => {
+              try {
+                const content = await superagent.get(path.join('https://http.cat/' + req.url));
+                await fs.writeFile(filePath, content.body);
+                console.log('Картинку взято з сайту');
+                res.setHeader("Content-Type", "image/jpeg");
+                res.writeHead(200);
+                res.end(content.body);
+              } catch (err) {
+                console.log('Запит закінчився помилкою');
+                console.log(err);
+                res.writeHead(404);
+                res.end();
+              }
+            });
+            break;
+            case 'PUT':
+              const chunks = [];
+          
+              //використовуємо масив якщо дані у запиті великі за розміром і їх не можливо отримати за один раз
+              req.on('data', chunk => {
+                  chunks.push(chunk);
+              });
+          
+            
+              req.on('end', async () => {
+                //створюємо картинку з фрагментів
+                  const imageBuffer = Buffer.concat(chunks); 
+          
+                  fs.writeFile(filePath, imageBuffer)
+                  .then(()=>{
+                    res.setHeader("Content-Type", "text/plain");
+                      res.writeHead(201);
+                      res.end('Created');
+                  })
+                  .catch(err=>{
+                    console.error('Error saving image:', err);
+                    res.writeHead(500);
+                    res.end('Error saving image.');
+                  })
+              });
+          
+              req.on('error', (err) => {
+                  console.error('Request error:', err);
+                  res.writeHead(400);
+                  res.end('Bad request.');
+              });
+              break;
+              case 'DELETE':
+                fs.unlink(filePath)
+                .then(()=>{
+                  res.setHeader("Content-Type", "text/plain");
+                      res.writeHead(200);
+                      res.end('Image deleted successfully.');
+                })
+                .catch(() =>{
+                  console.error('Not Found:', filePath);
+                  res.writeHead(404);
+                  res.end();
+                });
+                break;
+                default:
+                  console.error('Wrong method');
+                  res.writeHead(405);
+                  res.end();
+                  break;
+            }
+          }
+    
+
+
+const server = http.createServer(requestListener); 
+    
 
 server.listen(options.port, options.host, () => {
-  console.log(`Server running, url - > ${options.host}:${options.port}`);
+    console.log(`Server is running on http://${options.host}:${options.port}`);
 });
-
-function Get(code, filePath, res) {
-  fs.promises.readFile(filePath)
-  .then(data => {
-    res.writeHead(200, { 'Content-Type': 'image/jpeg' });
-    res.end(data);
-  })
-    .catch(() => {
-      res.writeHead(404);
-      res.end('File not found');
-    });
-}
-
-function Put (filePath,req,res) {
-  const data = [];
-  req.on('data', chunk => data.push(chunk));
-  req.on('end', () => {
-    fs.promises.writeFile(filePath, Buffer.concat(data)) 
-    .then(() => {
-      res.writeHead(201);
-      res.end('File created');
-    })
-    .catch(() => {
-      res.writeHead(500);
-      res.end('Internal Server Error');
-    });
-  });
-}
-
-function Delete (filePath, res) {
-  fs.unlink(filePath)
-  .then(() => {
-    res.writeHead(200);
-    res.end('File deleted');
-  })
-  .catch(() => {
-    res.writeHead(404);
-    res.end('File not found');
-  });
-}
-   
-server.on ('request', (req, res) => {
-  const code = req.url.slice(1);
-  const filePath = path.join(options.cache,`${code}.jpg` );
-  switch (req.method) {
-    case 'GET':
-      Get(code, filePath, res);
-      break;
-    case 'PUT':
-      Put(filePath, req, res);
-      break;
-    case 'DELETE':
-      Delete(filePath, res);
-      break;
-    default:
-      res.writeHead(405);
-      res.end();
-  }
-});   
